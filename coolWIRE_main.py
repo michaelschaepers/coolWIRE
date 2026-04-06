@@ -199,11 +199,11 @@ with st.sidebar:
     st.caption(f"🕐 {datetime.now().strftime('%d.%m.%Y %H:%M')}")
 
 # TABS
-tl = ["📁 1 · Projekt","❄️ 2 · Kühlstellen","🎛️ 3 · Steuerung","🔌 4 · Kabelplanung","📄 5 · Doku"]
-if ist_admin(): tl.append("🔑 6 · Admin")
+tl = ["📁 1 · Projekt","❄️ 2 · Kühlstellen","🧮 3 · Steuerung","🧵 4 · Kabelplanung","╔ 5 · Rohrnetz","📄 6 · Doku"]
+if ist_admin(): tl.append("🔑 7 · Admin")
 tabs = st.tabs(tl)
-t1,t2,t3,t4,t5 = tabs[:5]
-t6 = tabs[5] if ist_admin() else None
+t1,t2,t3,t4,t5_rohr,t5,t6_admin = tabs[0],tabs[1],tabs[2],tabs[3],tabs[4],tabs[5],tabs[6] if ist_admin() else None
+t6 = t6_admin
 
 # ============================================================
 # TAB 1 – PROJEKT
@@ -1615,6 +1615,77 @@ with t4:
 # ============================================================
 # TAB 5 – DOKUMENTATION
 # ============================================================
+# ============================================================
+# TAB 5 – ROHRNETZ
+# ============================================================
+with t5_rohr:
+    st.markdown('<div class="sec">🔧 Kältetechnische Rohrnetzberechnung</div>', unsafe_allow_html=True)
+    st.info("🚧 **Rohrnetzberechnung – in Entwicklung**\n\nDieser Tab wird mit coolROHR v6.2 erweitert. "
+            "Die Kühlstellendaten, Kälteleistungen, Leitungslängen und Kältemittel werden automatisch aus dem Projekt übernommen.")
+
+    ks_rohr = st.session_state.kuehlstellen
+    if not ks_rohr:
+        st.warning("Zuerst Kühlstellen in Tab 2 erfassen.")
+    else:
+        from collections import defaultdict
+        kreise_rohr = defaultdict(list)
+        for ks in ks_rohr:
+            kreise_rohr[ks.get("kreis",0)].append(ks)
+
+        kreis_farben = {1:"#DDEBF7", 2:"#E2EFDA", 3:"#FFF2CC"}
+        kreis_au = {
+            1: {"modell":"MDV-SY-50582 #2","kaeltemittel":"R513A","verdampfung_c":-8,"kondensation_c":47},
+            2: {"modell":"Sigilus BDF-NG-1075","kaeltemittel":"R449A","verdampfung_c":-28,"kondensation_c":42},
+            3: {"modell":"MDV-SY-50582 #1","kaeltemittel":"R513A","verdampfung_c":-8,"kondensation_c":47},
+        }
+
+        st.markdown("### Kreisübersicht – Eingangsdaten für Rohrnetzberechnung")
+        for kr_nr in sorted(kreise_rohr.keys()):
+            ks_liste = kreise_rohr[kr_nr]
+            au = kreis_au.get(kr_nr, {})
+            kw_sum = round(sum(k.get("kaelteleistung_kw",0) for k in ks_liste), 2)
+            laengen = [k.get("leitungslaenge_m",0) for k in ks_liste if k.get("leitungslaenge_m")]
+
+            with st.expander(f"Kreis {kr_nr} – {au.get('modell','?')} · {au.get('kaeltemittel','?')} · {kw_sum} kW · {len(ks_liste)} Kühlstellen", expanded=True):
+                rc1, rc2, rc3, rc4 = st.columns(4)
+                rc1.metric("Kältemittel", au.get("kaeltemittel","?"))
+                rc2.metric("Verdampfung", f"{au.get('verdampfung_c','?')}°C")
+                rc3.metric("Kondensation", f"{au.get('kondensation_c','?')}°C")
+                rc4.metric("Gesamtleistung", f"{kw_sum} kW")
+
+                st.markdown("**Kühlstellen in diesem Kreis:**")
+                rohr_data = []
+                for ks in ks_liste:
+                    rohr_data.append({
+                        "E-Nr": ks.get("e_nr","–"),
+                        "Pos.": ks.get("pos_nr","–"),
+                        "Bezeichnung": ks.get("name",""),
+                        "Leistung [kW]": ks.get("kaelteleistung_kw","?"),
+                        "Länge AU→KS [m]": ks.get("leitungslaenge_m","?"),
+                        "Temp [°C]": ks.get("raum_temp_soll_c","?"),
+                    })
+                import pandas as pd
+                st.dataframe(pd.DataFrame(rohr_data), use_container_width=True, hide_index=True)
+
+                st.markdown("---")
+                st.markdown("**⚙️ Rohrnetzberechnung** *(coolROHR Integration – folgt)*")
+                rr1, rr2, rr3 = st.columns(3)
+                with rr1:
+                    st.markdown("**Saugleitung**")
+                    st.caption("Rohrdimension: wird berechnet")
+                    st.caption("Druckabfall: wird berechnet")
+                with rr2:
+                    st.markdown("**Druckleitung**")
+                    st.caption("Rohrdimension: wird berechnet")
+                    st.caption("Druckabfall: wird berechnet")
+                with rr3:
+                    st.markdown("**Flüssigkeitsleitung**")
+                    st.caption("Rohrdimension: wird berechnet")
+                    st.caption("Druckabfall: wird berechnet")
+
+                st.info(f"📋 Sobald coolROHR integriert ist werden hier die Rohrdimensionen für alle "
+                        f"{len(ks_liste)} Kühlstellen in Kreis {kr_nr} automatisch berechnet.")
+
 with t5:
     st.markdown('<div class="sec">📄 Projektdokumentation & Export</div>', unsafe_allow_html=True)
     p2 = st.session_state.projekt

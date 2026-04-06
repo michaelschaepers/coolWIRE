@@ -80,6 +80,14 @@ html,body,[class*="css"]{{font-family:'{_fnt}',sans-serif;font-size:{_fsz};color
 .stDownloadButton>button{{background:var(--cb) !important;color:white !important;border:none !important;border-radius:8px !important;font-weight:600 !important;}}
 .stButton>button{{border-radius:8px !important;font-weight:600 !important;}}
 .footer{{margin-top:2rem;padding:0.6rem 1rem;background:var(--cl);border-top:2px solid var(--cborder);font-size:0.72rem;color:#aaa;text-align:center;border-radius:0 0 10px 10px;}}
+/* Verstecke Arrow-Platzhalter in Expandern */
+[data-testid="stExpander"] summary span[data-testid="stMarkdownContainer"] p::before {{content: none !important;}}
+[data-testid="stExpander"] summary::before {{display: none !important;}}
+details summary span.css-1ixbkrg {{display: none !important;}}
+[data-testid="stExpander"] [data-testid="stIcon"] {{display: none !important;}}
+p:has(> .arrow) {{display: none !important;}}
+span:has(> .arrow) {{display: none !important;}}
+.arrow_down, .arrowDown {{display: none !important;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -315,12 +323,24 @@ with t1:
                         placeholder="Dach...")
 
             if len(ms_list) > 1:
-                if st.button(f"🗑️ Anlage {ms_i+1} entfernen", key=f"ms_del_{ms_i}"):
-                    ms_list.pop(ms_i)
-                    st.session_state.maschinenstandorte = ms_list
-                    st.rerun()
+                if st.button(f"Anlage {ms_i+1} entfernen", key=f"ms_del_{ms_i}"):
+                    st.session_state["_ms_delete_idx"] = ms_i
 
         ms_list[ms_i] = ms
+
+    # Löschen NACH der Schleife ausführen (verhindert Index-Konflikte)
+    if st.session_state.get("_ms_delete_idx") is not None:
+        del_idx = st.session_state.pop("_ms_delete_idx")
+        if del_idx < len(ms_list):
+            ms_list.pop(del_idx)
+            # Widget-Keys für ALLE Anlagen löschen
+            for _ki in range(len(ms_list) + 5):
+                for _suffix in ["typ","desc","wrg","sma","ema","vgt","svf","evf","del"]:
+                    _wk = f"ms_{_suffix}_{_ki}"
+                    if _wk in st.session_state:
+                        del st.session_state[_wk]
+            st.session_state.maschinenstandorte = ms_list
+            st.rerun()
 
     if st.button("➕ Weitere Kälteanlage / Aggregat hinzufügen"):
         ms_list.append({"id": f"ms{len(ms_list)+1}",
@@ -329,6 +349,7 @@ with t1:
                         "standort_verfluessiger": "", "etage_verfluessiger": "",
                         "verfluessiger_getrennt": False, "waermerueckgewinnung": False,
                         "beschreibung": "", "kreise": []})
+        st.session_state.maschinenstandorte = ms_list
         st.rerun()
     st.session_state.maschinenstandorte = ms_list
 
